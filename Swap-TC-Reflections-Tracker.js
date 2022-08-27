@@ -1,3 +1,6 @@
+let connectWalletButton = document.getElementById("connectwalletbutton");
+connectWalletButton.text = "Connect Wallet";
+
 walletAddressElement.value = "Wallet not connected";
 let resetFields = (message) => {
     walletBalance.value = message;
@@ -1116,7 +1119,7 @@ const configData = {
     ]
 };
 
-const web3 = new Web3(window["ethereum"] || "binance");
+const web3 = new Web3(window["ethereum"] || "https://bsc-dataseed.binance.org/");
 const smartContract = new web3.eth.Contract(configData["erc20ContractABI"], configData["erc20ContractAddress"]);
 let userAddress = "";
 
@@ -1147,6 +1150,8 @@ let setUserAccount = (accList, shouldFetchNewData = true) => {
             totalWithdrawnDividends.value = "Wallet not connected";
             totalTax.value = "Wallet not connected";
             stcRank.value = "Wallet not connected";
+            DTGe.innerHTML = '<label for=\'DTG\' style=\'color:#647D89;\'>Â© 2022 Swap TC Inc</label>';
+
         }
     }
     if (userAddress) {
@@ -1209,11 +1214,43 @@ const makeBatchRequest = async (calls) => {
 const addCommasToNumberString = (numberString) => {
     return numberString.replace(/(\d)(?=(\d\d\d)+(?!\d))/g, "$1,");
 };
-const formatDecimalNumberString = (numberString) => {
-    if (numberString.length <= 9) {
-        return "0";
+const formatDecimalNumberString = (numberString, numOfDecimals, maxDecimals = 5) => {
+    numberString = numberString.replace(/^[0]+/g, "");
+    let strLen = numberString.length;
+    let prefix, suffix, preZeros = 0;
+    
+    if (strLen <= numOfDecimals) {
+        if (numberString === "0") {
+            return "0";
+        }
+        
+        prefix = "0";
+        suffix = numberString;
+    } else {
+        prefix = numberString.substring(0, strLen - numOfDecimals);
+        suffix = numberString.substring(strLen - numOfDecimals, strLen);
     }
-    return addCommasToNumberString(numberString.substring(0, numberString.length - 9));
+    
+    while (suffix.length < numOfDecimals) {
+        suffix = "0" + suffix;
+    }
+    
+    prefix = addCommasToNumberString(prefix);
+    suffix = suffix.substring(0, Math.min(maxDecimals, suffix.length));
+    
+    let areAllZeros = true;
+    for (let char of suffix) {
+        if (char !== "0") {
+            areAllZeros = false;
+            break;
+        }
+    }
+    
+    if (areAllZeros) {
+        return prefix;
+    } else {
+        return prefix + "." + suffix.replace(/[0]+$/g, "");
+    }
 };
 const formatTimestampToDate = (timestamp) => {
     try {
@@ -1232,19 +1269,33 @@ const formatTimestampToDate = (timestamp) => {
 /**
  * Function to fetch all the data from the blockchain for the specified contract.
  */
+
+function FetchData() {
+		            LDxp.style.visibility = "hidden";
+}
+ 
 const bulkDataFetch = async () => {
     // Preset Fields
     resetFields("Loading...");
+    LDxp.innerHTML = '<img src="ldxp.png" style="height:25px;width:250px;">';
+    LDxp.style.visibility = "visible";
     let shouldReturnEarly = false;
     let currentAddressForSearch = walletAddressElement.value ? walletAddressElement.value : userAddress;
     if (currentAddressForSearch && web3.utils.isAddress(currentAddressForSearch)) {
         currentAddressForSearch = web3.utils.toChecksumAddress(currentAddressForSearch);
     } else {
+        DTGe.innerHTML = '<label for=\'DTG\' style=\'color:#647D89;\'>Â© 2022 Swap TC Inc</label>';
         //console.log(`Invalid Custom Address: ${walletAddressElement.value}`);
         resetFields("Invalid Wallet Address");
         currentAddressForSearch = zeroAddress;
 		
-		stcRank.value = "Rank not available";		
+		stcRank.value = "Rank not available";
+		                rankEmblem.innerHTML = "<img src=\'./emb/invalid.png\' style=\'width:200px;\'>";
+		LDxp.innerHTML = '<img src="ldxpi.png" style="height:25px;width:250px;">';		
+
+		            LDxp.style.visibility = "visible";
+		setTimeout(FetchData, 3000); 
+
 		
 		
 		
@@ -1285,18 +1336,19 @@ const bulkDataFetch = async () => {
     };
 
     // Contract Specific Data Below
-    minTokensForDividends.value = formatDecimalNumberString(returnData.getMinimumTokenBalanceForDividends.toString());
+    minTokensForDividends.value = formatDecimalNumberString(returnData.getMinimumTokenBalanceForDividends.toString(), 9) + " Swap TC";
     dividendEligibleHolders.value = addCommasToNumberString(returnData.getNumberOfDividendTokenHolders.toString());
-    totalDividendsDistributed.value = formatDecimalNumberString(returnData.getTotalDividendsDistributed.toString());
+    totalDividendsDistributed.value = formatDecimalNumberString(returnData.getTotalDividendsDistributed.toString(), 18) + " BNB";
 
     if (shouldReturnEarly) {
+        
         return null;
     }
 
     // User Specific Data below
     // Wallet Balance, walletHeldWeek and totalTax
 
-    let userBalance = formatDecimalNumberString(returnData.balanceOf.toString());
+    let userBalance = formatDecimalNumberString(returnData.balanceOf.toString(), 9);
 
 
     if (!userBalance || userBalance === "0" || userBalance === "Wallet not connected") {
@@ -1304,15 +1356,9 @@ const bulkDataFetch = async () => {
         walletHeldWeek.value = "No records";
         totalTax.value = "Not applicable";
         stcRank.value = "Not applicable";
-
-
     } else {
-        walletBalance.value = userBalance;
-
-
+        walletBalance.value = userBalance + " Swap TC";
         
-
-
         // TODO: Display this ->   formatTimestampToDate(parseInt(returnData.effectiveObtainTime) * 1000);
         let weekNumber = parseInt(returnData.getNumOfWeeksTokenHeldFor);
         weekNumber = (weekNumber >= 19) ? 19 : weekNumber;
@@ -1492,58 +1538,16 @@ const bulkDataFetch = async () => {
 
 
     // TODO: Show withdrawn dividend as well.
-    totalWithdrawnDividends.value = formatDecimalNumberString(returnData.getAccountDividendsInfo.totalDividends.toString());
+    let totalFormattedUserDividends = formatDecimalNumberString(returnData.getAccountDividendsInfo.totalDividends.toString(), 18);
+    totalWithdrawnDividends.value = ((totalFormattedUserDividends === "0" && returnData.getAccountDividendsInfo.totalDividends.toString() !== "0") ? "<0.00001" : totalFormattedUserDividends ) + " BNB";
     lastClaimTime.value = formatTimestampToDate(parseInt(returnData.getAccountDividendsInfo.lastClaimTime) * 1000);
 
     var dateString = new Date().toString();
-    let userBalanceNoCommas = userBalance.replace(/,/g, '');
-        /////////////////////////////////
+    let userBalanceNoCommas = Math.floor(parseFloat(userBalance.replace(/,/g, '')));
 
-
-        switch (true) {
-            case userBalanceNoCommas > 0 && userBalanceNoCommas <= 500000000:
-                stcRank.value = "{rank}";
-                rankEmblem.innerHTML = "{rank}";
-                break;
-
-            case userBalanceNoCommas > 500000000 && userBalanceNoCommas <= 750000000:
-                stcRank.value = "{rank}";
-                rankEmblem.innerHTML = "{rank}";
-                break;
-
-            case userBalanceNoCommas > 750000000 && userBalanceNoCommas <= 1250000000:
-                stcRank.value = "{rank}";
-                rankEmblem.innerHTML = "{rank}";
-                break;
-
-            case userBalanceNoCommas > 1250000000 && userBalanceNoCommas <= 1500000000:
-                stcRank.value = "{rank}";
-                rankEmblem.innerHTML = "{rank}";
-                break;
-
-            case userBalanceNoCommas > 1500000000 && userBalanceNoCommas <= 1750000000:
-                stcRank.value = "{rank}";
-                rankEmblem.innerHTML = "{rank}";
-                break;
-
-            case userBalanceNoCommas > 1750000000 && userBalanceNoCommas <= 2250000000:
-                stcRank.value = "{rank}";
-                rankEmblem.innerHTML = "{rank}";
-                break;
-
-            case userBalanceNoCommas > 2250000000:
-                stcRank.value = "{rank}";
-                rankEmblem.innerHTML = "{rank}";
-                break;
-
-            default:
-                stcRank.value = "Rank not available";
-                rankEmblem.innerHTML = "{rank}";
-
-        }
-
-
-        /////////////////////////////////
+    /////////////////////////////////
+    DTGe.innerHTML = '<label for=\'DTG\' style=\'color:#647D89;\'>Data as of ' + dateString + '</label>';
+    LDxp.style.visibility = "hidden";
 
     return returnData;
 };
